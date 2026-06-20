@@ -1,0 +1,22 @@
+{
+  "name": "gmail-mcp-server",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "googleapis": "^144.0.0",
+    "zod": "^3.22.0"
+  },
+  "scripts": {
+    "start": "bun run src/server.ts",
+    "start:stdio": "bun run src/server.ts --stdio",
+    "setup": "bun run src/setup.ts"
+  }
+}
