@@ -10,7 +10,10 @@ import * as readline from "readline";
 
 const REDIRECT_PORT = 1975;
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/callback`;
-const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+];
 const ENV_FILE = ".env";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -213,6 +216,7 @@ const envContent = [
   `GMAIL_CLIENT_SECRET=${clientSecret}`,
   `GMAIL_REFRESH_TOKEN=${refreshToken}`,
   `PORT=${portStr}`,
+  `ENABLE_WRITE=false`,
 ].join("\n") + "\n";
 
 fs.writeFileSync(ENV_FILE, envContent, "utf-8");
