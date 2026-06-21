@@ -256,7 +256,7 @@ function createServer(): McpServer {
             "Content-Type: text/plain; charset=utf-8",
             "",
             body,
-          ].filter(Boolean).join("\r\n");
+          ].filter((line) => line !== null).join("\r\n");
 
           const raw = Buffer.from(lines).toString("base64url");
           const res = await gmail.users.messages.send({
