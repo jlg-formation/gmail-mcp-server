@@ -9,6 +9,7 @@ const PORT = parseInt(process.env.PORT ?? "1976", 10);
 const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID ?? "";
 const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET ?? "";
 const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN ?? "";
+const ENABLE_WRITE = process.env.ENABLE_WRITE === "true";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,12 @@ function createGmailClient() {
   const auth = new google.auth.OAuth2(GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET);
   auth.setCredentials({ refresh_token: GMAIL_REFRESH_TOKEN });
   return google.gmail({ version: "v1", auth });
+}
+
+// RFC 2047 encode a header value containing non-ASCII characters
+function encodeHeader(value: string): string {
+  if (!/[^\x00-\x7F]/.test(value)) return value;
+  return `=?UTF-8?B?${Buffer.from(value, "utf-8").toString("base64")}?=`;
 }
 
 // Decode a base64url-encoded Gmail message body part
@@ -221,6 +228,50 @@ function createServer(): McpServer {
       }
     }
   );
+
+  // ── send_message (only when ENABLE_WRITE=true) ────────────────────────────
+  if (ENABLE_WRITE) {
+    server.tool(
+      "send_message",
+      "Send an email via Gmail.",
+      {
+        to: z.string().describe("Recipient email address(es), comma-separated"),
+        subject: z.string().describe("Email subject"),
+        body: z.string().describe("Plain text email body"),
+        cc: z.string().optional().describe("CC address(es), comma-separated"),
+        bcc: z.string().optional().describe("BCC address(es), comma-separated"),
+        inReplyTo: z.string().optional().describe("Message-ID header of the message being replied to (for threading)"),
+        threadId: z.string().optional().describe("Gmail thread ID to attach this message to"),
+      },
+      async ({ to, subject, body, cc, bcc, inReplyTo, threadId }) => {
+        try {
+          const lines = [
+            `To: ${to}`,
+            cc ? `Cc: ${cc}` : null,
+            bcc ? `Bcc: ${bcc}` : null,
+            `Subject: ${encodeHeader(subject)}`,
+            inReplyTo ? `In-Reply-To: ${inReplyTo}` : null,
+            inReplyTo ? `References: ${inReplyTo}` : null,
+            "MIME-Version: 1.0",
+            "Content-Type: text/plain; charset=utf-8",
+            "",
+            body,
+          ].filter(Boolean).join("\r\n");
+
+          const raw = Buffer.from(lines).toString("base64url");
+          const res = await gmail.users.messages.send({
+            userId: "me",
+            requestBody: { raw, ...(threadId ? { threadId } : {}) },
+          });
+          return {
+            content: [{ type: "text", text: JSON.stringify({ id: res.data.id, threadId: res.data.threadId }, null, 2) }],
+          };
+        } catch (err) {
+          return { content: [{ type: "text", text: `Error: ${(err as Error).message}` }], isError: true };
+        }
+      }
+    );
+  }
 
   return server;
 }
